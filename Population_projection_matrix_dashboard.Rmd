@@ -1,0 +1,580 @@
+---
+title: "Population Projection Matrices"
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    navbar:
+      - { title: "reproducible.co.nz", href: "https://reproducible.co.nz", align: right }
+    orientation: columns
+    vertical_layout: fill
+    theme: spacelab
+    source_code: embed 
+---
+<style>
+
+body {
+  padding-top: 70px;
+}
+
+
+.navbar-brand {
+font-family: "Candara";
+  font-weight: bold;
+  font-size: 24px;
+}
+
+
+</style>
+
+```{r}
+# invisible(if(!("pacman" %in% list.files(.libPaths()))) install.packages("pacman"))
+
+# load via pacman required packages
+# pacman::p_load("sf", "flexdashboard", "shiny", "tidyverse", "DT")
+
+library(flexdashboard)
+library(shiny)
+library(tidyverse)
+library(shinyMatrix)
+library(popbio)
+library(diagram)
+library(DT)
+
+
+# turn off messages globally
+
+
+```
+
+
+Matrix
+=====================================
+
+
+
+Column {.sidebar data-width=250}
+-------------------------------------
+
+**Matrix input**
+```{r}
+numericInput("stages", label = "Number of ages / stages:",  "2")
+
+```
+
+<br/>
+
+**Life history diagram: features**
+```{r}
+sliderInput("bubble.size", label = "Bubble size", min = 0, 
+        max = 0.05, value = 0.05, ticks = FALSE)
+```
+
+<br/>
+
+**Finite rate of growth**
+*(lambda)*
+
+```{r}
+renderPrint({
+  
+  req(input$stages)
+  req(input$matrix1)
+  
+  cat(round(lambda(input$matrix1), 4))
+})
+```
+<br/>
+
+**Time units required for population doubling**
+
+*(only if population is growing)*
+
+```{r}
+renderPrint({
+  
+  req(input$stages)
+  req(input$matrix1)
+  
+  my.lambda <- lambda(input$matrix1)
+  
+  if(my.lambda > 1) {
+  cat(round(log(2, lambda(input$matrix1)), 2))
+  } else {
+  cat(NA)
+  }
+})
+```
+<br/>
+
+
+
+```{r}
+# Create placeholder for the download button
+uiOutput("download_matrix_UI")
+
+output$download_matrix_UI <- renderUI( {
+  downloadButton("down_matrix_Btn", "Download matrix", style = "width:100%;")
+})
+
+output$down_matrix_Btn <- downloadHandler(
+  filename = function() {'Name your matrix.csv'},
+  content = function(file) {
+    write.csv(input$matrix1, file, row.names = TRUE)
+  }
+)
+```
+
+
+<br/>
+
+```{r}
+# Create placeholder for the download button
+plotInput <- reactive({
+  options(warn = -1)
+  
+  req(input$stages)
+  req(input$matrix1)
+  req(input$bubble.size)
+  
+  my.matrix <- suppressMessages(input$matrix1)
+  
+  validate(need(dim(my.matrix)[1] == input$stages, "Updating..."))
+  
+  rownames(my.matrix) <- paste("stage", 1:input$stages)
+  colnames(my.matrix) <- paste("stage", 1:input$stages)
+  
+  plotmat(my.matrix,
+          input$stages,
+          box.size = input$bubble.size,
+          curve = 0.5)
+  
+})
+
+
+uiOutput("download_diagram_UI")
+
+output$download_diagram_UI <- renderUI({
+  downloadButton("down_diagram_Btn", "Download diagram", style = "width:100%;")
+})
+
+output$down_diagram_Btn <- downloadHandler(
+  filename = "Name this diagram.png",
+  content = function(file) {
+    png(file, width = 800, height = 700, units = "px")
+    plotInput()
+    dev.off()
+  }
+)
+```
+
+
+
+Column {data-width=460}
+-------------------------------------
+
+### Matrix of vital rates (survival and fecundity)
+
+* Columns represent the stage the species transitions **from**
+* Rows represent the stage the species transitions **to**
+
+<br/>
+
+```{r}
+
+renderUI({
+  
+  req(input$stages)
+  
+    ir <- input$stages
+    ic <- input$stages
+    validate(
+      need(isTruthy(ir),label = "Number of ages /stages is required"),
+    )
+    
+    my.matrix <- matrix(data=0,
+                               nrow=ir,
+                               ncol=ic)
+    colnames(my.matrix) <- paste("Stage", 1: input$stages)
+    rownames(my.matrix) <- paste("Stage", 1: input$stages)
+    
+    matrixInput("matrix1",
+                value = my.matrix,
+                rows = list(
+                  n=ir, names = TRUE,
+                  editableNames = TRUE),
+                cols = list (
+                  n=ic, names = TRUE,
+                  editableNames = TRUE),
+                class = "numeric")
+  })
+
+```
+
+
+
+
+
+Column {data-width=700}
+-------------------------------------
+### Life history diagram
+
+```{r}
+
+
+
+my.diagram <- reactive({
+  
+  options(warn=-1)
+
+ req(input$stages)
+ req(input$matrix1)
+ req(input$bubble.size)
+
+
+  
+ my.matrix <- suppressMessages(input$matrix1)
+
+ 
+validate(
+  need(
+    dim(my.matrix)[1]== input$stages, "Updating...")
+)
+
+ rownames(my.matrix) <- paste("stage", 1: input$stages)
+ colnames(my.matrix) <- paste("stage", 1: input$stages)
+ 
+
+ plotmat(my.matrix, input$stages,  box.size = input$bubble.size,  curve = 0.5)
+
+ 
+ 
+ 
+})
+
+
+
+renderPlot({
+  
+  my.diagram()
+  
+})
+
+
+
+
+
+
+```
+
+Population structure
+=====================================
+
+Column {.sidebar data-width=250}
+-------------------------------------
+
+**Stable age/stage structure**:  the expected stage/age structure if the vital rates are sustained over the long term.
+
+<br/>
+
+**Reproductive value**: the comparative reproductive value of an individual in each stage/age assuming the vital rates are sustained over the long term. The units are in juvenile equivalents (where a juvenile represents the earliest possible stage).
+
+
+
+Column 
+-------------------------------------
+
+### Stable age structure
+
+```{r}
+
+renderPrint({
+  
+  req(input$stages)
+  req(input$matrix1)
+  
+  sa <- stable.stage(input$matrix1) %>% round(3) * 100
+  
+  sa.df <- data.frame(stage = 1: input$stages , percentage = sa)
+  
+  print(sa.df, row.names = FALSE)
+})
+```
+
+### Reproductive value
+
+```{r}
+
+renderPrint({
+  
+  req(input$matrix1)
+  
+  ra <- reproductive.value(input$matrix1) %>% round(3)
+  
+  ra.df <- data.frame(stage = 1: input$stages , reproductive.value = ra)
+  
+  print(ra.df, row.names = FALSE)
+})
+```
+
+
+Diagnostics
+=====================================
+
+
+
+
+Column {.sidebar data-width=250}
+-------------------------------------
+
+**Elasticity** = results of a small
+proportional perturbation
+
+<br/>
+
+**Sensitivity** = results of a small
+incremental perturbation
+
+
+*Warning: Users of this dashboard should be familiar with the consequences of pre- and post breeding monitoring, and birth pulse vs birth flow dynamics on matrix structure. Failure to account for such differences will lead to misinterpretation.*
+
+
+
+Column 
+-------------------------------------
+
+
+
+
+### Elasticity
+
+```{r}
+
+renderPrint({
+  
+  req(input$matrix1)
+  
+  elasticity(input$matrix1) %>% round(3)
+})
+```
+
+### Sensitivity
+
+```{r}
+
+renderPrint({
+  
+  req(input$matrix1)
+  
+  sensitivity(input$matrix1) %>% round(3)
+})
+```
+
+
+
+Population projections
+=====================================
+
+Column {.sidebar data-width=250}
+-------------------------------------
+
+
+
+**Edit starting seeds**
+(for matrix projection)
+
+```{r}
+renderUI({
+  
+  req(input$stages)
+  
+  ir <- input$stages
+
+  validate(
+    need(isTruthy(ir),label = "Matrix is required"),
+  )
+  
+  my.matrix <- matrix(data=0, nrow=ir)
+  rownames(my.matrix) <- paste("Stage", 1: input$stages)
+  
+  matrixInput("vector",
+              value = my.matrix,
+              rows = list(
+                n=ir, names = TRUE,
+                editableNames = TRUE),
+              cols = list(
+                n=1, names = FALSE,
+                editableNames = TRUE),
+              class = "numeric")
+})
+```
+
+<br/>
+
+```{r}
+sliderInput("show.years", HTML("<b>Maximum years to show</b>"),
+    min = 0, max = 20, value = 20
+  )
+```
+
+
+
+<br/>
+<br/>
+
+*Warning: the graph is showing a projection, what would happen if the vital rates were stable over time. Projections are useful for setting ball-park expectations when carrying capacity is not an issue, but should not be used for general forecasting.*
+
+<br/>
+
+```{r}
+uiOutput("download_graph_UI")
+
+output$download_graph_UI <- renderUI({
+  downloadButton("down_graph_Btn", "Download graph", style = "width:100%;")
+})
+
+output$down_graph_Btn <- downloadHandler(
+  filename = "Name this projection.png",
+    content = function(file) {
+      png(file=file, width = 900, height = 600)
+      plot(my.plot())
+      dev.off()
+  }
+)
+```
+
+
+Column 
+-------------------------------------
+
+```{r}
+# make projection
+
+my.plot <-   reactive({
+  
+  req(input$matrix1)
+  req(input$vector)
+  
+  
+  validate(
+  need(ncol(input$matrix1) == length(input$vector), "Updating...")
+)
+
+  my.start <- input$vector %>% as.vector()
+  my.proj <- pop.projection(input$matrix1, my.start)
+  
+  # projection
+  p <- pop.projection(input$matrix1, my.start)
+  
+  # change data structure
+  projection <- p$stage.vectors %>% as.data.frame()
+  projection <- t(projection)
+  colnames(projection) <- paste("Stage", 1:dim(projection)[2])
+  projection <- projection %>% as.data.frame()
+  projection$Year <- 0:(nrow(projection) - 1)
+  projection <- projection %>% relocate(Year, .before = 1)
+  
+  # pivot longer
+  projection.longer <- projection %>%
+    pivot_longer(cols = colnames(projection)[2]:colnames(projection)[ncol(projection)],
+                 names_to = "Stage",
+                 values_to = "N")
+  
+  # filter based on input$show.years
+  projection.longer <- projection.longer %>% filter(Year <= input$show.years)
+  
+  # remove "Stage" string from variable
+  projection.longer$Stage <- str_replace_all(projection.longer$Stage , "Stage", "")
+  projection.longer$Stage <- as.numeric(as.character(projection.longer$Stage)) %>% as.factor()
+
+  # graph
+  ggplot() +
+    theme_bw() +
+    geom_col(data = projection.longer,
+              aes(x = Year, y = N, fill = Stage)) +
+    xlab("\nYears since establishment") +
+    ylab("Projected population\n")+
+    theme(axis.text = element_text(size =14))+
+    theme(axis.title = element_text(size =20))+
+    theme(legend.text = element_text(size =14))+
+    theme(legend.title = element_text(size =14))+
+    scale_x_continuous(breaks = 0:max(projection.longer$Year))
+  
+})
+  
+
+
+#activate <- eventReactive(input$submit, {my.plot()})
+
+renderPlot({
+  
+  my.plot()
+  
+}, height = 700)
+
+```  
+
+
+
+Videos: dashboard
+=====================================
+
+Column {.sidebar data-width=250}
+-------------------------------------
+
+Video help can be found on the righthand side. 
+
+If you are running this dashboard locally and not seeing anything try opening the dashboard in your browser (by clicking "Open in Browser" present in the top left of this screen).
+
+Alternatively, click the links below: 
+
+ * [Tour: Introduction](https://www.loom.com/share/4f0b50882e9c4e9988fc16bd97a9237c?sid=5df8d81b-905c-43a9-8c35-7c2b07e83d33)
+ * [Tour: Matrix tab](https://www.loom.com/share/fbba17a736584bafbd2b9cd6cc2784e5?sid=f00ad79e-12ee-4612-bbc7-713743aaec0a)
+ * [1: Intro to PPMs](https://www.loom.com/share/e64d7f6b7636407c80deffd305c9a22b?sid=49ef4cc5-8f71-4e6f-a2d5-57674ec95708)
+ * [2: Analysing PPMs](https://www.loom.com/share/4bca6673af5e4f9e8f0ef6f832e1eef4?sid=9eb1f84e-5be6-4f36-98f5-01696b59035f)
+ * [3: Birthing](https://www.loom.com/share/24d60f0e5be148cb9713158b954b501b?sid=02e1c797-cc8c-4b1d-8ede-2e08cbc5559c)
+ * [4: Finding data](https://www.loom.com/share/c911e57fdcf64c8a8a340ea5e56bdf5e?sid=5e495545-dc44-4eaf-ba7c-983f4299ce27)
+
+Column {.tabset .tabset-fade}
+-------------------------------------
+
+### Tour: Introduction
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/4f0b50882e9c4e9988fc16bd97a9237c?sid=5ce6847b-61cc-4f9c-89ad-e9cbe3c42cd5" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 75%; height: 75%;"></iframe></div>
+
+
+### Tour: Matrix tab
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/fbba17a736584bafbd2b9cd6cc2784e5?sid=eafcd485-96ed-41e0-9f7e-cca495948f09" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 75%; height: 75%;"></iframe></div>
+
+### 1:Intro to PPMs
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/e64d7f6b7636407c80deffd305c9a22b?sid=e5a4cd13-6a0b-4aa5-929f-e25b2e529144" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 75%; height: 75%;"></iframe></div>
+
+
+### 2: Analysing PPMs
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/4bca6673af5e4f9e8f0ef6f832e1eef4?sid=ca629469-2205-48b7-b83d-30c54b2c08c4" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 75%; height: 75%;"></iframe></div>
+
+### 3: Birthing
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/24d60f0e5be148cb9713158b954b501b?sid=6c1192c9-4301-4304-b870-ebed33c9bc8d" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 75%; height: 75%;"></iframe></div>
+
+### 4: Finding data
+
+<div style="position: relative; padding-bottom: 56.25%; height: 0;"><iframe src="https://www.loom.com/embed/c911e57fdcf64c8a8a340ea5e56bdf5e?sid=cc9f3ff9-14ac-4484-b757-0811bea19acb" frameborder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style="position: absolute; top: 0; left: 0; width: 75%; height: 75%;"></iframe></div>
+
+
+
+Reference 
+=====================================
+
+
+Column {.tabset .tabset-fade}
+-------------------------------------
+
+```{r}
+tags$iframe(style="height:1000px; width:100%; scrolling=yes",
+src="Kendall et al 2019.pdf")
+```
+
+
