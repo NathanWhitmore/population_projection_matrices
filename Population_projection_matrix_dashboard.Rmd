@@ -334,6 +334,7 @@ proportional perturbation
 **Sensitivity** = results of a small
 incremental perturbation
 
+<br/>
 
 *Warning: Users of this dashboard should be familiar with the consequences of pre- and post breeding monitoring, and birth pulse vs birth flow dynamics on matrix structure. Failure to account for such differences will lead to misinterpretation.*
 
@@ -515,7 +516,7 @@ renderPlot({
 
 
 
-Videos: dashboard
+Videos
 =====================================
 
 Column {.sidebar data-width=250}
@@ -567,6 +568,21 @@ Column {.tabset .tabset-fade}
 
 Reference 
 =====================================
+
+Column {.sidebar data-width=250}
+-------------------------------------
+
+**Viewing**
+
+Click *Open in Browser* on top lefthand side to view.
+
+<br/>
+
+**Acknowledgements**
+
+The code for this dashboard was written by Nathan Whitmore, and is freely available for reuse and modification via an [MIT license](https://choosealicense.com/licenses/mit/). The source code can be found under the under the '</> Source Code' tab or via [GitHub](https://github.com/NathanWhitmore/population_projection_matrices). 
+
+Dashboard creation was funded by Auckland Council. Special thanks go to Sabine Melzer for instigating this project.
 
 
 Column {.tabset .tabset-fade}
