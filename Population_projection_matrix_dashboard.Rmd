@@ -574,7 +574,7 @@ Column {.sidebar data-width=250}
 
 **Viewing**
 
-Click *Open in Browser* on top lefthand side to view.
+Click *Open in Browser* on top lefthand side to view (if not already visible).
 
 <br/>
 
