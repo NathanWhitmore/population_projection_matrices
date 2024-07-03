@@ -4,11 +4,15 @@ runtime: shiny
 output:
   flexdashboard::flex_dashboard:
     navbar:
-      - { title: "reproducible.co.nz", href: "https://reproducible.co.nz", align: right }
+    - title: reproducible.co.nz
+      href: https://reproducible.co.nz
+      align: right
     orientation: columns
     vertical_layout: fill
     theme: spacelab
-    source_code: embed 
+    source_code: embed
+resource_files:
+- "AC-corporate-logo.png"
 ---
 <style>
 
@@ -40,20 +44,17 @@ library(popbio)
 library(diagram)
 library(DT)
 
-
-# turn off messages globally
-
-
 ```
-
 
 Matrix
 =====================================
 
-
-
 Column {.sidebar data-width=250}
 -------------------------------------
+
+![](AC-corporate-logo.png){width=90%}
+<br/>
+<br/>
 
 **Matrix input**
 ```{r}
